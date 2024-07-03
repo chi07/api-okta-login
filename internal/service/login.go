@@ -56,8 +56,14 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 		return nil, fmt.Errorf("email claim not found")
 	}
 
+	name, ok := claims.Claims["name"].(string)
+	if !ok {
+		s.log.Error().Msg("name claim not found")
+		return nil, fmt.Errorf("name claim not found")
+	}
+
 	// @TODO: check if the user is already registered in the database
-	user, err := s.CheckUser(ctx, username, email)
+	user, err := s.CheckUser(ctx, username, email, name)
 	if err != nil {
 		s.log.Error().Err(err).Msg("s.CheckUser() got err: " + err.Error())
 		return nil, err
@@ -122,7 +128,7 @@ func (s *OktaService) VerifyToken(ctx context.Context, requestToken string) (*jw
 	return token, true, nil
 }
 
-func (s *OktaService) CheckUser(ctx context.Context, oktaID, email string) (*model.User, error) {
+func (s *OktaService) CheckUser(ctx context.Context, oktaID, email, name string) (*model.User, error) {
 	user, err := s.userRepo.GetByOktaID(ctx, oktaID)
 	if err != nil {
 		s.log.Error().Err(err).Msg("s.userRepo.GetByOktaID() got err: " + err.Error())
@@ -133,7 +139,7 @@ func (s *OktaService) CheckUser(ctx context.Context, oktaID, email string) (*mod
 	if user == nil {
 		now := time.Now()
 		user = &model.User{
-			Name:      "ChiPV",
+			Name:      name,
 			OktaID:    oktaID,
 			Email:     email,
 			CreatedAt: now,
