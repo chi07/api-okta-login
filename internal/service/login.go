@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/sessions"
 	"github.com/okta/okta-jwt-verifier-golang/v2"
 	"github.com/rs/zerolog"
 
@@ -18,16 +20,20 @@ type OktaService struct {
 	oktaConfig       *config.OktaConfig
 	jwtConfig        *config.JWTConfig
 	userRepo         UserRepo
+	sessionStore     *sessions.CookieStore
 	loginHistoryRepo LoginHistoryRepo
+	client           *resty.Client
 }
 
-func NewOktaService(log *zerolog.Logger, oktaConfig *config.OktaConfig, jwtConfig *config.JWTConfig, userRepo UserRepo, loginHistoryRepo LoginHistoryRepo) *OktaService {
+func NewOktaService(log *zerolog.Logger, oktaConfig *config.OktaConfig, jwtConfig *config.JWTConfig, userRepo UserRepo, loginHistoryRepo LoginHistoryRepo, sessionStore *sessions.CookieStore, client *resty.Client) *OktaService {
 	return &OktaService{
 		log:              log,
 		oktaConfig:       oktaConfig,
 		jwtConfig:        jwtConfig,
 		userRepo:         userRepo,
 		loginHistoryRepo: loginHistoryRepo,
+		sessionStore:     sessionStore,
+		client:           client,
 	}
 }
 
@@ -44,26 +50,35 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 	}
 
 	// Test if the token is valid
-	username, ok := claims.Claims["sub"].(string)
-	if !ok {
-		s.log.Error().Msg("sub claim not found")
-		return nil, fmt.Errorf("sub claim not found")
-	}
-
-	email, ok := claims.Claims["email"].(string)
+	userOktaID, ok := claims.Claims["uid"].(string)
+	email, ok := claims.Claims["sub"].(string)
 	if !ok {
 		s.log.Error().Msg("email claim not found")
 		return nil, fmt.Errorf("email claim not found")
 	}
 
-	name, ok := claims.Claims["name"].(string)
-	if !ok {
-		s.log.Error().Msg("name claim not found")
-		return nil, fmt.Errorf("name claim not found")
+	// @TODO get userinfo from Okta
+	var oktaUserInfo model.OktaUserInfo
+	oktaURL := fmt.Sprintf("%s/v1/userinfo", s.oktaConfig.Issuer)
+	client := resty.New()
+	resp, err := client.R().
+		SetHeader("Authorization", "Bearer "+oktaToken).
+		SetHeader("Accept", "application/json").
+		SetResult(&oktaUserInfo).
+		Get(oktaURL)
+
+	if err != nil {
+		s.log.Error().Err(err).Msg("client.R().Get() got err: " + err.Error())
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		s.log.Error().Msg("failed to get userinfo from Okta")
+		return nil, fmt.Errorf("failed to get userinfo from Okta")
 	}
 
 	// @TODO: check if the user is already registered in the database
-	user, err := s.CheckUser(ctx, username, email, name)
+	user, err := s.CheckUser(ctx, userOktaID, oktaUserInfo.Email, oktaUserInfo.Name)
 	if err != nil {
 		s.log.Error().Err(err).Msg("s.CheckUser() got err: " + err.Error())
 		return nil, err
@@ -86,7 +101,7 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":    user.OktaID,
 		"oktaID": user.OktaID,
-		"email":  user.Email,
+		"email":  email,
 		"exp":    time.Now().Add(time.Second * s.jwtConfig.ExpiredAfter).Unix(),
 		"iat":    time.Now().Unix(),
 	})
@@ -105,7 +120,7 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 func (s *OktaService) VerifyToken(ctx context.Context, requestToken string) (*jwtverifier.Jwt, bool, error) {
 	toValidate := map[string]string{}
 	toValidate["nonce"] = s.oktaConfig.Nonce
-	toValidate["aud"] = s.oktaConfig.ClientID
+	toValidate["aud"] = "api://default" // Get this from Okta application
 
 	jwtVerifierSetup := jwtverifier.JwtVerifier{
 		Issuer:           s.oktaConfig.Issuer,
@@ -142,6 +157,7 @@ func (s *OktaService) CheckUser(ctx context.Context, oktaID, email, name string)
 			Name:      name,
 			OktaID:    oktaID,
 			Email:     email,
+			Status:    "active",
 			CreatedAt: now,
 			UpdatedAt: now,
 		}

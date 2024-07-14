@@ -12,4 +12,15 @@ type User struct {
 	UpdatedAt time.Time `json:"updatedAt,omitempty" bson:"updated_at"`
 }
 
+type OktaUserInfo struct {
+	Sub           string `json:"sub"`
+	Name          string `json:"name"`
+	Email         string `json:"email"`
+	GiveName      string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	EmailVerified bool   `json:"email_verified"`
+	ZoneInfo      string `json:"zoneinfo"`
+	Locale        string `json:"locale"`
+}
+
 const StatusActivated = "activated"

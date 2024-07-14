@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"github.com/go-resty/resty/v2"
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
 	"net/http"
 	"os"
 
@@ -36,13 +39,18 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to connect to MongoDB")
 	}
 
+	sessionStore := sessions.NewCookieStore([]byte(cnf.SessionConfig))
+	e.Use(session.Middleware(sessionStore))
+
 	db := client.Database(cnf.MongoDB.DBName)
 	userRepo := repository.NewUser(db)
 	loginHistoryRepo := repository.NewLoginHistory(db)
-	oktaService := service.NewOktaService(&logger, cnf.OktaConfig, cnf.JWTConfig, userRepo, loginHistoryRepo)
+	restyClient := resty.New()
+	oktaService := service.NewOktaService(&logger, cnf.OktaConfig, cnf.JWTConfig, userRepo, loginHistoryRepo, sessionStore, restyClient)
 	loginHandler := handler.NewLoginHandler(cnf, logger, validate, oktaService)
 
 	e.POST("/login", loginHandler.LoginWithOkta)
+	e.POST("/logout", loginHandler.LoginWithOkta)
 
 	e.Logger.Fatal(e.Start(":1323"))
 }

@@ -24,9 +24,10 @@ type JWTConfig struct {
 }
 
 type Config struct {
-	MongoDB    *MongoDBConfig
-	OktaConfig *OktaConfig
-	JWTConfig  *JWTConfig
+	MongoDB       *MongoDBConfig
+	OktaConfig    *OktaConfig
+	JWTConfig     *JWTConfig
+	SessionConfig string
 }
 
 func NewConfig() *Config {
@@ -45,5 +46,6 @@ func NewConfig() *Config {
 			SecretKey:    viper.GetString("JWT_SECRET_KEY"),
 			ExpiredAfter: viper.GetDuration("JWT_EXPIRED_AFTER"),
 		},
+		SessionConfig: viper.GetString("SESSION_SECRET"),
 	}
 }
