@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"github.com/go-resty/resty/v2"
-	"github.com/gorilla/sessions"
-	"github.com/labstack/echo-contrib/session"
 	"net/http"
 	"os"
 
+	"github.com/go-resty/resty/v2"
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
@@ -24,6 +24,7 @@ import (
 func main() {
 	viper.AutomaticEnv()
 	e := echo.New()
+
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "It's work")
 	})
@@ -51,6 +52,7 @@ func main() {
 
 	e.POST("/login", loginHandler.LoginWithOkta)
 	e.POST("/logout", loginHandler.LoginWithOkta)
+	e.GET("/my-ip", loginHandler.GetMyIP)
 
 	e.Logger.Fatal(e.Start(":1323"))
 }

@@ -27,6 +27,12 @@ func NewLoginHandler(config *config.Config, log zerolog.Logger, validator *valid
 	}
 }
 
+func (h *LoginHandler) GetMyIP(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"ip": c.RealIP(),
+	})
+}
+
 func (h *LoginHandler) LoginWithOkta(c echo.Context) error {
 	var req request.LoginRequest
 
