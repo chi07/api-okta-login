@@ -89,6 +89,7 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 		_, err = s.loginHistoryRepo.Create(context.Background(), &model.LoginHistory{
 			OktaID:    user.OktaID,
 			Email:     user.Email,
+			Detail:    "xxxx",
 			Status:    model.StatusSuccess,
 			CreatedAt: time.Now(),
 		})

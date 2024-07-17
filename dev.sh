@@ -1,4 +1,4 @@
-export MONGODB_URI="mongodb://localhost:27017"
+export MONGODB_URI="mongodb://46.250.232.24:27017"
 export MONGODB_DB="priceAlerts"
 export OKTA_CLIENT_ID="0oagllbqkndAe2ArM5d7"
 export OKTA_CLIENT_SECRET="QG10g2WJuee00WBYxeaa0Bpetbxu3mDr89u1eMvuOjy7apqVHHSGQytEXMOQCOAN"

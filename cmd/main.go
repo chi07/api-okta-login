@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/chi07/api-okta-login/internal/http/middleware"
 	"net/http"
 	"os"
 
@@ -34,6 +35,8 @@ func main() {
 
 	var validate *validator.Validate
 	validate = validator.New()
+	store := sessions.NewCookieStore([]byte(cnf.SessionConfig))
+	authMiddleware := middleware.NewAuthMiddleWare(store, cnf.JWTConfig)
 
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(cnf.MongoDB.URI))
 	if err != nil {
@@ -51,7 +54,7 @@ func main() {
 	loginHandler := handler.NewLoginHandler(cnf, logger, validate, oktaService)
 
 	e.POST("/login", loginHandler.LoginWithOkta)
-	e.POST("/logout", loginHandler.LoginWithOkta)
+	e.POST("/logout", loginHandler.Logout, authMiddleware.Auth)
 	e.GET("/my-ip", loginHandler.GetMyIP)
 
 	e.Logger.Fatal(e.Start(":1323"))
