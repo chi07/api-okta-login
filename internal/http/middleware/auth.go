@@ -1,42 +1,73 @@
 package middleware
 
 import (
-	"fmt"
-	"github.com/pkg/errors"
 	"net/http"
 	"strings"
 
-	"github.com/chi07/api-okta-login/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+
+	"github.com/chi07/api-okta-login/internal/config"
 )
 
 type AuthMiddleWare struct {
 	store     *sessions.CookieStore
 	jwtConfig *config.JWTConfig
+	log       zerolog.Logger
 }
 
-func NewAuthMiddleWare(store *sessions.CookieStore, jwtConfig *config.JWTConfig) *AuthMiddleWare {
-	return &AuthMiddleWare{store: store, jwtConfig: jwtConfig}
+func NewAuthMiddleWare(store *sessions.CookieStore, jwtConfig *config.JWTConfig, log zerolog.Logger) *AuthMiddleWare {
+	return &AuthMiddleWare{store: store, jwtConfig: jwtConfig, log: log}
 }
 
 func (m *AuthMiddleWare) Auth(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		fmt.Println("auth middleware")
+		// @TODO Kiểm tra accessToken có hợp lệ không, nếu không hợp lệ thì trả về lỗi token không hợp lệ
 		jwtToken, claims, err := m.secureEndpoint(c)
 		if !jwtToken.Valid || err != nil {
-			return errors.New("invalid token")
+			m.log.Error().Err(err).Msg("Invalid token")
+			return err
 		}
 
 		// Get user info from the claims
-		fmt.Println(claims)
+		var userID, email string
+		if sub, ok := (*claims)["sub"].(string); ok {
+			userID = sub
+		}
+		if em, ok := (*claims)["email"].(string); ok {
+			email = em
+		}
 
 		// @TODO Kiểm tra accessToken có ở trong sessions ko, nếu không có thì trả về lỗi token không hợp lệ
+		bearerToken, err := m.getBearerToken(c)
+		if err != nil {
+			m.log.Error().Err(err).Msg("m.getBearerToken() got err: " + err.Error())
+		}
+
+		currentUser, err := m.store.Get(c.Request(), "currentUser")
+		if err != nil {
+			m.log.Error().Err(err).Msg("m.store.Get() got err: " + err.Error())
+		}
+
+		storedAccessToken := currentUser.Values["accessToken"]
+		if bearerToken != storedAccessToken {
+			m.log.Info().Msg("Invalid token: token not found in session")
+			c.Error(err)
+			return errors.New("invalid token: token not found in session")
+		}
+
+		m.log.Info().Msg("User is authenticated")
+
+		c.Set("userID", userID)
+		c.Set("email", email)
+		c.Set("accessToken", storedAccessToken)
 
 		// Execute the handler
-		err = next(c)
-		if err != nil {
+		if err = next(c); err != nil {
+			m.log.Error().Err(err).Msg("next(c) got err: " + err.Error())
 			c.Error(err)
 		}
 
@@ -63,8 +94,7 @@ func (m *AuthMiddleWare) getBearerToken(c echo.Context) (string, error) {
 func (m *AuthMiddleWare) decodeJWT(tokenString string) (*jwt.Token, *jwt.MapClaims, error) {
 	claims := &jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		// Verify the token signature with your secret key or public key
-		return []byte("oYUMa8rT8EHUfOzZ0U0Ul5FzMBgM0DO4"), nil
+		return []byte(m.jwtConfig.SecretKey), nil
 	})
 	return token, claims, err
 }

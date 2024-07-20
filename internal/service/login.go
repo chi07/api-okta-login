@@ -8,6 +8,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/sessions"
+	"github.com/labstack/echo/v4"
 	"github.com/okta/okta-jwt-verifier-golang/v2"
 	"github.com/rs/zerolog"
 
@@ -37,9 +38,9 @@ func NewOktaService(log *zerolog.Logger, oktaConfig *config.OktaConfig, jwtConfi
 	}
 }
 
-func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]interface{}, error) {
+func (s *OktaService) Login(ctx echo.Context, oktaToken string) (map[string]interface{}, error) {
 	// @TODO: verify token and do something with the token
-	claims, ok, err := s.VerifyToken(ctx, oktaToken)
+	claims, ok, err := s.VerifyToken(ctx.Request().Context(), oktaToken)
 	if err != nil {
 		s.log.Error().Err(err).Msg("s.VerifyToken() got err: " + err.Error())
 		return nil, err
@@ -78,7 +79,7 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 	}
 
 	// @TODO: check if the user is already registered in the database
-	user, err := s.CheckUser(ctx, userOktaID, oktaUserInfo.Email, oktaUserInfo.Name)
+	user, err := s.CheckUser(ctx.Request().Context(), userOktaID, oktaUserInfo.Email, oktaUserInfo.Name)
 	if err != nil {
 		s.log.Error().Err(err).Msg("s.CheckUser() got err: " + err.Error())
 		return nil, err
@@ -89,7 +90,6 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 		_, err = s.loginHistoryRepo.Create(context.Background(), &model.LoginHistory{
 			OktaID:    user.OktaID,
 			Email:     user.Email,
-			Detail:    "xxxx",
 			Status:    model.StatusSuccess,
 			CreatedAt: time.Now(),
 		})
@@ -110,6 +110,19 @@ func (s *OktaService) Login(ctx context.Context, oktaToken string) (map[string]i
 	token, err := jwtToken.SignedString([]byte(s.jwtConfig.SecretKey))
 	if err != nil {
 		s.log.Error().Err(err).Msg("jwtToken.SignedString() got err: " + err.Error())
+		return nil, err
+	}
+
+	// @TODO: save the token to the session
+	session, err := s.sessionStore.Get(ctx.Request(), "currentUser")
+	if err != nil {
+		s.log.Error().Err(err).Msg("s.sessionStore.Get() got err: " + err.Error())
+		return nil, err
+	}
+
+	session.Values["accessToken"] = token
+	if err = session.Save(ctx.Request(), ctx.Response()); err != nil {
+		s.log.Error().Err(err).Msg("session.Save() got err: " + err.Error())
 		return nil, err
 	}
 
@@ -171,4 +184,22 @@ func (s *OktaService) CheckUser(ctx context.Context, oktaID, email, name string)
 	}
 
 	return user, nil
+}
+
+func (s *OktaService) Logout(ctx echo.Context) error {
+	// @TODO: remove the token from the session
+	session, err := s.sessionStore.Get(ctx.Request(), "currentUser")
+	if err != nil {
+		s.log.Error().Err(err).Msg("s.sessionStore.Get() got err: " + err.Error())
+		return err
+	}
+
+	// set accessToken to empty
+	session.Values["accessToken"] = ""
+	if err = session.Save(ctx.Request(), ctx.Response()); err != nil {
+		s.log.Error().Err(err).Msg("session.Save() got err: " + err.Error())
+		return err
+	}
+
+	return nil
 }

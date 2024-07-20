@@ -35,8 +35,16 @@ func (h *LoginHandler) GetMyIP(c echo.Context) error {
 
 func (h *LoginHandler) Logout(c echo.Context) error {
 	// @TODO: xoá access token trong session như hôm qua đi
+	if err := h.oktaService.Logout(c); err != nil {
+		h.log.Error().Err(err).Msg("failed to logout")
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"message": err.Error(),
+			"code":    http.StatusBadRequest,
+		})
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message": "logout",
+		"message": "logout successfully",
 	})
 }
 
@@ -59,7 +67,7 @@ func (h *LoginHandler) LoginWithOkta(c echo.Context) error {
 		})
 	}
 
-	result, err := h.oktaService.Login(c.Request().Context(), req.OktaToken)
+	result, err := h.oktaService.Login(c, req.OktaToken)
 	if err != nil {
 		h.log.Error().Err(err).Msg("failed to login")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{

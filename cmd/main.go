@@ -36,7 +36,7 @@ func main() {
 	var validate *validator.Validate
 	validate = validator.New()
 	store := sessions.NewCookieStore([]byte(cnf.SessionConfig))
-	authMiddleware := middleware.NewAuthMiddleWare(store, cnf.JWTConfig)
+	authMiddleware := middleware.NewAuthMiddleWare(store, cnf.JWTConfig, logger)
 
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(cnf.MongoDB.URI))
 	if err != nil {
@@ -53,9 +53,12 @@ func main() {
 	oktaService := service.NewOktaService(&logger, cnf.OktaConfig, cnf.JWTConfig, userRepo, loginHistoryRepo, sessionStore, restyClient)
 	loginHandler := handler.NewLoginHandler(cnf, logger, validate, oktaService)
 
-	e.POST("/login", loginHandler.LoginWithOkta)
+	e.POST("/login", loginHandler.LoginWithOkta) // public endpoint
+
 	e.POST("/logout", loginHandler.Logout, authMiddleware.Auth)
-	e.GET("/my-ip", loginHandler.GetMyIP)
+
+	// private endpoints
+	e.GET("/my-ip", loginHandler.GetMyIP, authMiddleware.Auth)
 
 	e.Logger.Fatal(e.Start(":1323"))
 }

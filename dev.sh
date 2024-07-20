@@ -6,5 +6,6 @@ export OKTA_ISSUER="https://dev-96634040.okta.com/oauth2/default"
 export JWT_SECRET_KEY="oYUMa8rT8EHUfOzZ0U0Ul5FzMBgM0DO4"
 export JWT_EXPIRED_AFTER=846000
 export OKTA_NONCE="h7JmSXePP0c25ch1ieNZqfn8ABwZpEGZ"
+export SESSION_SECRET="HU1ccfGYqXSlU5Y"
 
 go run cmd/main.go
