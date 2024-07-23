@@ -133,7 +133,9 @@ func (s *OktaService) Login(ctx echo.Context, oktaToken string) (map[string]inte
 
 func (s *OktaService) VerifyToken(ctx context.Context, requestToken string) (*jwtverifier.Jwt, bool, error) {
 	toValidate := map[string]string{}
-	toValidate["nonce"] = s.oktaConfig.Nonce
+	//toValidate["nonce"] = s.oktaConfig.Nonce
+	toValidate["cid"] = s.oktaConfig.ClientID
+	//toValidate["aud"] = s.oktaConfig.ClientID // Get this from Okta application
 	toValidate["aud"] = "api://default" // Get this from Okta application
 
 	jwtVerifierSetup := jwtverifier.JwtVerifier{
