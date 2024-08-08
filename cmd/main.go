@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/chi07/api-okta-login/internal/http/middleware"
 	"net/http"
 	"os"
 
@@ -17,6 +16,7 @@ import (
 
 	"github.com/chi07/api-okta-login/internal/config"
 	"github.com/chi07/api-okta-login/internal/http/handler"
+	"github.com/chi07/api-okta-login/internal/http/middleware"
 	"github.com/chi07/api-okta-login/internal/repository"
 	"github.com/chi07/api-okta-login/internal/service"
 	"github.com/go-playground/validator/v10"
@@ -53,12 +53,16 @@ func main() {
 	oktaService := service.NewOktaService(&logger, cnf.OktaConfig, cnf.JWTConfig, userRepo, loginHistoryRepo, sessionStore, restyClient)
 	loginHandler := handler.NewLoginHandler(cnf, logger, validate, oktaService)
 
+	currencyConfigRepo := repository.NewCurrencyConfig(db)
+	currencyConfigService := service.NewCurrencyConfigService(currencyConfigRepo)
+	currencyConfigHandler := handler.NewCurrencyConfigHandler(cnf, logger, validate, currencyConfigService)
+
 	e.POST("/login", loginHandler.LoginWithOkta) // public endpoint
 
 	e.POST("/logout", loginHandler.Logout, authMiddleware.Auth)
 
-	// private endpoints
-	e.GET("/my-ip", loginHandler.GetMyIP, authMiddleware.Auth)
+	// bulk update exclusive currency
+	e.PUT("/currency-config/bulk", currencyConfigHandler.BulkUpdateExclusiveCurrency)
 
 	e.Logger.Fatal(e.Start(":1323"))
 }
