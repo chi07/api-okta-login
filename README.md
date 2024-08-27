@@ -5,6 +5,8 @@ Login with Okta
 
 # commit 2
 
+# commit 3
+
 ```go
 export MONGODB_URI="mongodb://localhost:27017"
 export MONGODB_DB="priceAlerts"
