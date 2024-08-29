@@ -61,7 +61,7 @@ func main() {
 
 	e.POST("/logout", loginHandler.Logout, authMiddleware.Auth)
 
-	// bulk update exclusive currency
+	// @TODO: add middleware to check if user is logged in
 	e.PUT("/currency-config/bulk", currencyConfigHandler.BulkUpdateExclusiveCurrency)
 
 	e.Logger.Fatal(e.Start(":1323"))
